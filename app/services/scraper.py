@@ -1,13 +1,16 @@
 import httpx
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from typing import Optional, Dict
+import re
 
 
 async def fetch_page_content(url: str) -> str:
     """Fetch HTML content from a URL."""
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
     }
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(url, headers=headers, follow_redirects=True)
@@ -18,12 +21,53 @@ async def fetch_page_content(url: str) -> str:
 def is_youtube_url(url: str) -> bool:
     """Check if the URL is a YouTube video."""
     parsed = urlparse(url)
-    youtube_domains = ["youtube.com", "www.youtube.com", "youtu.be", "www.youtu.be"]
+    youtube_domains = ["youtube.com", "www.youtube.com", "youtu.be", "www.youtu.be", "m.youtube.com"]
     if parsed.netloc in youtube_domains:
         return True
     if "youtube.com/watch" in url or "youtu.be/" in url:
         return True
     return False
+
+
+def extract_youtube_video_id(url: str) -> Optional[str]:
+    """Extract YouTube video ID from URL."""
+    parsed = urlparse(url)
+
+    # Handle youtu.be short links
+    if parsed.netloc in ["youtu.be", "www.youtu.be"]:
+        return parsed.path.lstrip("/")
+
+    # Handle youtube.com/watch?v= links
+    if parsed.netloc in ["youtube.com", "www.youtube.com", "m.youtube.com"]:
+        query = parse_qs(parsed.query)
+        if "v" in query:
+            return query["v"][0]
+
+    return None
+
+
+async def fetch_youtube_metadata(url: str) -> Optional[Dict[str, Optional[str]]]:
+    """Fetch YouTube video metadata using oEmbed API."""
+    video_id = extract_youtube_video_id(url)
+    if not video_id:
+        return None
+
+    oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(oembed_url)
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "title": data.get("title"),
+                    "description": data.get("title"),  # oEmbed doesn't provide description, use title
+                    "source_type": "youtube"
+                }
+    except Exception:
+        pass
+
+    return None
 
 
 def extract_metadata(html: str, url: str) -> Dict[str, Optional[str]]:
@@ -79,6 +123,13 @@ def extract_metadata(html: str, url: str) -> Dict[str, Optional[str]]:
 
 async def scrape_url(url: str) -> Dict[str, Optional[str]]:
     """Main function to scrape a URL and extract metadata."""
+    # For YouTube, try oEmbed API first (more reliable on servers)
+    if is_youtube_url(url):
+        yt_metadata = await fetch_youtube_metadata(url)
+        if yt_metadata and yt_metadata.get("title"):
+            return yt_metadata
+
+    # Fallback to HTML scraping
     try:
         html = await fetch_page_content(url)
         return extract_metadata(html, url)
