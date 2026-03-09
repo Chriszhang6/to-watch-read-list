@@ -123,19 +123,39 @@ def extract_metadata(html: str, url: str) -> Dict[str, Optional[str]]:
 
 async def scrape_url(url: str) -> Dict[str, Optional[str]]:
     """Main function to scrape a URL and extract metadata."""
-    # For YouTube, try oEmbed API first (more reliable on servers)
+    result = {
+        "title": None,
+        "description": None,
+        "source_type": "other"
+    }
+
+    # For YouTube, try oEmbed API for title (more reliable on servers)
     if is_youtube_url(url):
+        result["source_type"] = "youtube"
         yt_metadata = await fetch_youtube_metadata(url)
         if yt_metadata and yt_metadata.get("title"):
-            return yt_metadata
+            result["title"] = yt_metadata["title"]
 
-    # Fallback to HTML scraping
+    # Always try HTML scraping for description
     try:
         html = await fetch_page_content(url)
-        return extract_metadata(html, url)
+        html_metadata = extract_metadata(html, url)
+
+        # Use HTML title as fallback if oEmbed didn't work
+        if not result["title"] and html_metadata.get("title"):
+            result["title"] = html_metadata["title"]
+
+        # Always use HTML description if available
+        if html_metadata.get("description"):
+            result["description"] = html_metadata["description"]
+
+        # Set source_type from HTML if not already set
+        if result["source_type"] == "other":
+            result["source_type"] = html_metadata.get("source_type", "other")
+
     except Exception as e:
-        return {
-            "title": None,
-            "description": f"Failed to fetch content: {str(e)}",
-            "source_type": "other"
-        }
+        # If HTML scraping fails, at least we might have oEmbed title
+        if not result["title"]:
+            result["description"] = f"Failed to fetch content: {str(e)}"
+
+    return result
