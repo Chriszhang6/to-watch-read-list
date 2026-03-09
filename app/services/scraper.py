@@ -1,8 +1,12 @@
+import os
 import httpx
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, Dict
 import re
+
+
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 
 async def fetch_page_content(url: str) -> str:
@@ -61,9 +65,44 @@ async def fetch_youtube_metadata(url: str) -> Optional[Dict[str, Optional[str]]]
                 data = response.json()
                 return {
                     "title": data.get("title"),
-                    "description": data.get("title"),  # oEmbed doesn't provide description, use title
+                    "description": None,  # oEmbed doesn't provide description
                     "source_type": "youtube"
                 }
+    except Exception:
+        pass
+
+    return None
+
+
+async def fetch_youtube_data_api(url: str) -> Optional[Dict[str, Optional[str]]]:
+    """Fetch YouTube video metadata using YouTube Data API v3."""
+    if not YOUTUBE_API_KEY:
+        return None
+
+    video_id = extract_youtube_video_id(url)
+    if not video_id:
+        return None
+
+    api_url = "https://www.googleapis.com/youtube/v3/videos"
+    params = {
+        "part": "snippet",
+        "id": video_id,
+        "key": YOUTUBE_API_KEY
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(api_url, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                items = data.get("items", [])
+                if items:
+                    snippet = items[0].get("snippet", {})
+                    return {
+                        "title": snippet.get("title"),
+                        "description": snippet.get("description"),
+                        "source_type": "youtube"
+                    }
     except Exception:
         pass
 
@@ -129,33 +168,43 @@ async def scrape_url(url: str) -> Dict[str, Optional[str]]:
         "source_type": "other"
     }
 
-    # For YouTube, try oEmbed API for title (more reliable on servers)
+    # For YouTube videos
     if is_youtube_url(url):
         result["source_type"] = "youtube"
+
+        # Try YouTube Data API first (best source for description)
+        yt_api_data = await fetch_youtube_data_api(url)
+        if yt_api_data:
+            result["title"] = yt_api_data.get("title")
+            result["description"] = yt_api_data.get("description")
+            return result
+
+        # Fallback to oEmbed for title
         yt_metadata = await fetch_youtube_metadata(url)
         if yt_metadata and yt_metadata.get("title"):
             result["title"] = yt_metadata["title"]
 
-    # Always try HTML scraping for description
+        # Try HTML scraping for description as last resort
+        try:
+            html = await fetch_page_content(url)
+            html_metadata = extract_metadata(html, url)
+            if not result["title"] and html_metadata.get("title"):
+                result["title"] = html_metadata["title"]
+            if html_metadata.get("description"):
+                result["description"] = html_metadata["description"]
+        except Exception:
+            pass
+
+        return result
+
+    # For non-YouTube URLs, use HTML scraping
     try:
         html = await fetch_page_content(url)
         html_metadata = extract_metadata(html, url)
-
-        # Use HTML title as fallback if oEmbed didn't work
-        if not result["title"] and html_metadata.get("title"):
-            result["title"] = html_metadata["title"]
-
-        # Always use HTML description if available
-        if html_metadata.get("description"):
-            result["description"] = html_metadata["description"]
-
-        # Set source_type from HTML if not already set
-        if result["source_type"] == "other":
-            result["source_type"] = html_metadata.get("source_type", "other")
-
+        result["title"] = html_metadata.get("title")
+        result["description"] = html_metadata.get("description")
+        result["source_type"] = html_metadata.get("source_type", "other")
     except Exception as e:
-        # If HTML scraping fails, at least we might have oEmbed title
-        if not result["title"]:
-            result["description"] = f"Failed to fetch content: {str(e)}"
+        result["description"] = f"Failed to fetch content: {str(e)}"
 
     return result
