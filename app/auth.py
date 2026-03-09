@@ -7,8 +7,13 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from starlette.responses import RedirectResponse
 
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
-APP_PASSWORD = os.getenv("APP_PASSWORD", "admin123")
+SECRET_KEY = os.getenv("SECRET_KEY")
+APP_PASSWORD = os.getenv("APP_PASSWORD")
+
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable is required")
+if not APP_PASSWORD:
+    raise RuntimeError("APP_PASSWORD environment variable is required")
 
 serializer = URLSafeTimedSerializer(SECRET_KEY, salt="auth")
 security = HTTPBearer(auto_error=False)
