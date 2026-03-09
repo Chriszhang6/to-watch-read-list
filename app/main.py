@@ -17,7 +17,6 @@ from .auth import (
     set_session_cookie, clear_session_cookie, SESSION_COOKIE_NAME
 )
 from .services.scraper import scrape_url
-from .services.summarizer import generate_summary
 
 load_dotenv()
 
@@ -92,18 +91,11 @@ async def create_item(
     # Scrape metadata
     metadata = await scrape_url(item_data.url)
 
-    # Generate summary
-    summary = await generate_summary(
-        metadata["title"],
-        metadata["description"],
-        metadata["source_type"]
-    )
-
     # Create item
     item = Item(
         url=item_data.url,
         title=metadata["title"] or "Untitled",
-        summary=summary,
+        summary=metadata["description"],
         source_type=metadata["source_type"]
     )
 
