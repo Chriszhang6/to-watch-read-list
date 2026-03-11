@@ -17,27 +17,53 @@
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <h1 class="text-2xl font-bold text-gray-800">待看/读清单</h1>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <!-- View Toggle -->
+                    <div class="flex rounded-md overflow-hidden border border-gray-200">
+                        <button
+                            @click="viewMode = 'list'"
+                            :class="viewMode === 'list' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                            class="px-3 py-2 transition font-medium text-sm flex items-center gap-1"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                            </svg>
+                            列表
+                        </button>
+                        <button
+                            @click="viewMode = 'calendar'"
+                            :class="viewMode === 'calendar' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                            class="px-3 py-2 transition font-medium text-sm flex items-center gap-1"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            日历
+                        </button>
+                    </div>
+
+                    <span class="text-gray-300">|</span>
+
                     <button
                         @click="setStatusFilter('pending')"
                         :class="statusFilter === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'"
                         class="px-4 py-2 rounded-md transition font-medium text-sm"
                     >
-                        待看 (<span x-text="pendingCount"></span>)
+                        待看 (<span x-text="stats.pending"></span>)
                     </button>
                     <button
                         @click="setStatusFilter('completed')"
                         :class="statusFilter === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'"
                         class="px-4 py-2 rounded-md transition font-medium text-sm"
                     >
-                        已完成
+                        已完成 (<span x-text="stats.completed"></span>)
                     </button>
                     <button
                         @click="setStatusFilter('all')"
                         :class="statusFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'"
                         class="px-4 py-2 rounded-md transition font-medium text-sm"
                     >
-                        全部
+                        全部 (<span x-text="stats.total"></span>)
                     </button>
                     <button
                         @click="logout()"
@@ -84,8 +110,135 @@
             </form>
         </div>
 
-        <!-- Items List -->
-        <div class="space-y-6">
+        <!-- Calendar View -->
+        <div x-show="viewMode === 'calendar'" x-cloak class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <!-- Calendar Navigation -->
+            <div class="flex items-center justify-between mb-4">
+                <button
+                    @click="previousMonth()"
+                    class="p-2 hover:bg-gray-100 rounded-md transition"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <h2 class="text-lg font-semibold text-gray-800" x-text="calendarTitle"></h2>
+                <button
+                    @click="nextMonth()"
+                    class="p-2 hover:bg-gray-100 rounded-md transition"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Calendar Grid -->
+            <div class="grid grid-cols-7 gap-1">
+                <!-- Weekday Headers -->
+                <template x-for="day in ['日', '一', '二', '三', '四', '五', '六']" :key="day">
+                    <div class="text-center text-sm font-medium text-gray-500 py-2" x-text="day"></div>
+                </template>
+
+                <!-- Calendar Days -->
+                <template x-for="(day, index) in calendarDays" :key="index">
+                    <div
+                        class="min-h-[60px] p-1 border border-gray-100 rounded-md transition cursor-pointer"
+                        :class="{
+                            'bg-gray-50': !day.currentMonth,
+                            'bg-blue-50': day.hasItems && day.currentMonth,
+                            'ring-2 ring-blue-500': day.date === selectedDate,
+                            'hover:bg-blue-100': day.currentMonth
+                        }"
+                        @click="selectDate(day)"
+                    >
+                        <div
+                            class="text-sm font-medium"
+                            :class="{
+                                'text-gray-300': !day.currentMonth,
+                                'text-gray-700': day.currentMonth && day.date !== selectedDate,
+                                'text-blue-600': day.date === selectedDate
+                            }"
+                            x-text="day.day"
+                        ></div>
+                        <div x-show="day.hasItems" class="flex justify-center mt-1">
+                            <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Selected Date Items -->
+            <div x-show="selectedDateItems.length > 0" class="mt-6 pt-6 border-t border-gray-200">
+                <h3 class="text-md font-semibold text-gray-700 mb-3" x-text="selectedDateTitle"></h3>
+                <div class="space-y-3">
+                    <template x-for="item in selectedDateItems" :key="item.id">
+                        <div class="bg-gray-50 rounded-lg p-3 transition hover:bg-gray-100">
+                            <div class="flex items-start gap-3">
+                                <button
+                                    @click="toggleComplete(item)"
+                                    class="mt-0.5 flex-shrink-0"
+                                    :class="item.completed ? 'text-green-500' : 'text-gray-300 hover:text-green-500'"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path x-show="!item.completed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        <path x-show="item.completed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" fill="currentColor" />
+                                    </svg>
+                                </button>
+
+                                <div class="flex-1 min-w-0">
+                                    <a
+                                        :href="item.url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="block"
+                                    >
+                                        <h4
+                                            class="font-medium text-gray-800 hover:text-blue-500 transition text-sm"
+                                            :class="item.completed ? 'line-through text-gray-400' : ''"
+                                            x-text="item.title || '无标题'"
+                                        ></h4>
+                                    </a>
+                                    <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                                        <span
+                                            class="px-1.5 py-0.5 rounded text-xs font-medium"
+                                            :class="{
+                                                'bg-red-100 text-red-700': item.source_type === 'youtube',
+                                                'bg-blue-100 text-blue-700': item.source_type === 'article',
+                                                'bg-gray-100 text-gray-700': item.source_type === 'other'
+                                            }"
+                                            x-text="item.source_type === 'youtube' ? 'YouTube' : item.source_type === 'article' ? '文章' : '其他'"
+                                        ></span>
+                                    </div>
+                                </div>
+
+                                <div class="flex-shrink-0 flex gap-1">
+                                    <button
+                                        @click="toggleComplete(item)"
+                                        class="text-xs px-2 py-1 rounded transition"
+                                        :class="item.completed ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-green-100 text-green-700 hover:bg-green-200'"
+                                        x-text="item.completed ? '撤销' : '完成'"
+                                    ></button>
+                                    <button
+                                        @click="deleteItem(item.id)"
+                                        class="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition"
+                                    >
+                                        删除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div x-show="selectedDate && selectedDateItems.length === 0" class="mt-6 pt-6 border-t border-gray-200 text-center text-gray-500 text-sm">
+                该日期没有条目
+            </div>
+        </div>
+
+        <!-- Items List (List View) -->
+        <div x-show="viewMode === 'list'" class="space-y-6">
             <template x-for="(group, date) in groupedItems" :key="date">
                 <div>
                     <h2 class="text-lg font-semibold text-gray-600 mb-3 flex items-center gap-2">
@@ -182,22 +335,64 @@
                 newUrl: '',
                 statusFilter: 'pending',
                 isLoading: false,
+                viewMode: 'list',
+                currentYear: new Date().getFullYear(),
+                currentMonth: new Date().getMonth(),
+                selectedDate: null,
+                itemDates: [],
+                selectedDateItems: [],
+                stats: { total: 0, pending: 0, completed: 0 },
 
                 init() {
                     this.fetchItems();
+                    this.fetchItemDates();
+                    this.fetchStats();
                 },
 
                 async fetchItems() {
                     try {
-                        const response = await fetch(`/api/items?status=${this.statusFilter}`);
+                        let url = `/api/items?status=${this.statusFilter}`;
+                        if (this.viewMode === 'calendar' && this.selectedDate) {
+                            url = `/api/items?date=${this.selectedDate}`;
+                        }
+                        const response = await fetch(url);
                         if (response.status === 401) {
                             window.location.href = '/login';
                             return;
                         }
                         const data = await response.json();
                         this.items = data.items;
+
+                        // Update selectedDateItems if in calendar mode
+                        if (this.viewMode === 'calendar' && this.selectedDate) {
+                            this.selectedDateItems = this.items;
+                        }
                     } catch (error) {
                         console.error('Failed to fetch items:', error);
+                    }
+                },
+
+                async fetchItemDates() {
+                    try {
+                        const response = await fetch('/api/items/dates');
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.itemDates = data.dates;
+                        }
+                    } catch (error) {
+                        console.error('Failed to fetch item dates:', error);
+                    }
+                },
+
+                async fetchStats() {
+                    try {
+                        const response = await fetch('/api/items/stats');
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.stats = data;
+                        }
+                    } catch (error) {
+                        console.error('Failed to fetch stats:', error);
                     }
                 },
 
@@ -215,6 +410,8 @@
                         if (response.ok) {
                             this.newUrl = '';
                             await this.fetchItems();
+                            await this.fetchItemDates();
+                            await this.fetchStats();
                         } else if (response.status === 401) {
                             window.location.href = '/login';
                         } else {
@@ -238,6 +435,8 @@
 
                         if (response.ok) {
                             await this.fetchItems();
+                            await this.fetchItemDates();
+                            await this.fetchStats();
                         } else if (response.status === 401) {
                             window.location.href = '/login';
                         }
@@ -256,6 +455,8 @@
 
                         if (response.ok) {
                             await this.fetchItems();
+                            await this.fetchItemDates();
+                            await this.fetchStats();
                         } else if (response.status === 401) {
                             window.location.href = '/login';
                         }
@@ -307,8 +508,99 @@
                     return groups;
                 },
 
-                get pendingCount() {
-                    return this.items.filter(item => !item.completed).length;
+                // Calendar methods
+                get calendarTitle() {
+                    return `${this.currentYear}年${this.currentMonth + 1}月`;
+                },
+
+                get calendarDays() {
+                    const days = [];
+                    const firstDay = new Date(this.currentYear, this.currentMonth, 1);
+                    const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
+                    const startPadding = firstDay.getDay();
+                    const totalDays = lastDay.getDate();
+
+                    // Previous month padding
+                    const prevMonth = new Date(this.currentYear, this.currentMonth, 0);
+                    for (let i = startPadding - 1; i >= 0; i--) {
+                        const day = prevMonth.getDate() - i;
+                        const date = this.formatDateStandard(prevMonth.getFullYear(), prevMonth.getMonth(), day);
+                        days.push({
+                            day: day,
+                            date: date,
+                            currentMonth: false,
+                            hasItems: this.hasItemsOnDate(date)
+                        });
+                    }
+
+                    // Current month days
+                    for (let i = 1; i <= totalDays; i++) {
+                        const date = this.formatDateStandard(this.currentYear, this.currentMonth, i);
+                        days.push({
+                            day: i,
+                            date: date,
+                            currentMonth: true,
+                            hasItems: this.hasItemsOnDate(date)
+                        });
+                    }
+
+                    // Next month padding
+                    const remaining = 42 - days.length; // 6 rows x 7 days
+                    for (let i = 1; i <= remaining; i++) {
+                        const date = this.formatDateStandard(this.currentYear, this.currentMonth + 1, i);
+                        days.push({
+                            day: i,
+                            date: date,
+                            currentMonth: false,
+                            hasItems: this.hasItemsOnDate(date)
+                        });
+                    }
+
+                    return days;
+                },
+
+                formatDateStandard(year, month, day) {
+                    const m = String(month + 1).padStart(2, '0');
+                    const d = String(day).padStart(2, '0');
+                    return `${year}-${m}-${d}`;
+                },
+
+                hasItemsOnDate(dateStr) {
+                    return this.itemDates.includes(dateStr);
+                },
+
+                previousMonth() {
+                    if (this.currentMonth === 0) {
+                        this.currentMonth = 11;
+                        this.currentYear--;
+                    } else {
+                        this.currentMonth--;
+                    }
+                },
+
+                nextMonth() {
+                    if (this.currentMonth === 11) {
+                        this.currentMonth = 0;
+                        this.currentYear++;
+                    } else {
+                        this.currentMonth++;
+                    }
+                },
+
+                async selectDate(day) {
+                    if (!day.currentMonth) return;
+                    this.selectedDate = day.date;
+                    await this.fetchItems();
+                },
+
+                get selectedDateTitle() {
+                    if (!this.selectedDate) return '';
+                    const date = new Date(this.selectedDate);
+                    return date.toLocaleDateString('zh-CN', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
                 }
             }
         }

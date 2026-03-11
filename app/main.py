@@ -111,6 +111,7 @@ async def list_items(
     status_filter: str = Query("all", alias="status", regex="^(all|pending|completed)$"),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    date: Optional[str] = None,
     db: Session = Depends(get_db),
     _: bool = Depends(get_current_user)
 ):
@@ -123,20 +124,31 @@ async def list_items(
     elif status_filter == "completed":
         query = query.filter(Item.completed == True)
 
-    # Apply date filters
-    if date_from:
+    # Apply single date filter (for calendar view)
+    if date:
         try:
-            from_date = datetime.strptime(date_from, "%Y-%m-%d")
-            query = query.filter(Item.captured_at >= from_date)
+            target_date = datetime.strptime(date, "%Y-%m-%d")
+            next_day = datetime.strptime(date, "%Y-%m-%d")
+            from datetime import timedelta
+            next_day = next_day + timedelta(days=1)
+            query = query.filter(Item.captured_at >= target_date, Item.captured_at < next_day)
         except ValueError:
             pass
+    else:
+        # Apply date range filters
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, "%Y-%m-%d")
+                query = query.filter(Item.captured_at >= from_date)
+            except ValueError:
+                pass
 
-    if date_to:
-        try:
-            to_date = datetime.strptime(date_to, "%Y-%m-%d")
-            query = query.filter(Item.captured_at <= to_date)
-        except ValueError:
-            pass
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, "%Y-%m-%d")
+                query = query.filter(Item.captured_at <= to_date)
+            except ValueError:
+                pass
 
     # Order by captured_at descending
     query = query.order_by(Item.captured_at.desc())
@@ -145,6 +157,40 @@ async def list_items(
     total = len(items)
 
     return {"items": items, "total": total}
+
+
+@app.get("/api/items/dates")
+async def get_item_dates(
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
+    """Get all dates that have items (for calendar view)."""
+    from sqlalchemy import func
+    from datetime import timedelta
+
+    # Query distinct dates from captured_at
+    items = db.query(Item).all()
+
+    dates = set()
+    for item in items:
+        # Get just the date part (YYYY-MM-DD)
+        date_str = item.captured_at.strftime("%Y-%m-%d")
+        dates.add(date_str)
+
+    return {"dates": sorted(list(dates), reverse=True)}
+
+
+@app.get("/api/items/stats")
+async def get_item_stats(
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
+    """Get item counts by status."""
+    total = db.query(Item).count()
+    pending = db.query(Item).filter(Item.completed == False).count()
+    completed = db.query(Item).filter(Item.completed == True).count()
+
+    return {"total": total, "pending": pending, "completed": completed}
 
 
 @app.patch("/api/items/{item_id}", response_model=ItemResponse)
