@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class ItemCreate(BaseModel):
@@ -30,8 +30,42 @@ class ItemListResponse(BaseModel):
     total: int
 
 
-class LoginRequest(BaseModel):
+class RegisterRequest(BaseModel):
+    email: str
     password: str
+
+    @field_validator('email')
+    @classmethod
+    def email_must_be_valid(cls, v):
+        if '@' not in v:
+            raise ValueError('Invalid email address')
+        return v.lower()
+
+    @field_validator('password')
+    @classmethod
+    def password_must_be_strong(cls, v):
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters')
+        return v
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+    @field_validator('email')
+    @classmethod
+    def email_to_lower(cls, v):
+        return v.lower()
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class MessageResponse(BaseModel):

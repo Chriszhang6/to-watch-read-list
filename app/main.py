@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -10,17 +10,21 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 from .database import get_db, init_db, engine, Base
-from .models import Item
-from .schemas import ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, LoginRequest, MessageResponse
+from .models import Item, User
+from .schemas import (
+    ItemCreate, ItemUpdate, ItemResponse, ItemListResponse,
+    LoginRequest, RegisterRequest, MessageResponse
+)
 from .auth import (
-    create_session, verify_session, get_current_user,
-    set_session_cookie, clear_session_cookie, SESSION_COOKIE_NAME
+    create_session, verify_session, get_current_user, get_current_user_id,
+    set_session_cookie, clear_session_cookie, SESSION_COOKIE_NAME,
+    authenticate_user, create_user, get_user_by_email
 )
 from .services.scraper import scrape_url
 
 load_dotenv()
 
-app = FastAPI(title="To Watch/Read List", version="1.0.0")
+app = FastAPI(title="Watchlist", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,16 +61,51 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    """Render the registration page."""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if token and verify_session(token):
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse("register.html", {"request": request})
+
+
 # Auth API Routes
+@app.post("/api/register", response_model=MessageResponse)
+async def register(
+    register_data: RegisterRequest,
+    db: Session = Depends(get_db)
+):
+    """Handle registration request."""
+    # Check if email already exists
+    existing_user = get_user_by_email(db, register_data.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    # Create user
+    user = create_user(db, register_data.email, register_data.password)
+
+    return {"message": "Registration successful"}
+
+
 @app.post("/api/login")
-async def login(request: Request, login_data: LoginRequest):
+async def login(
+    request: Request,
+    login_data: LoginRequest,
+    db: Session = Depends(get_db)
+):
     """Handle login request."""
-    token = create_session(login_data.password)
-    if not token:
+    user = authenticate_user(db, login_data.email, login_data.password)
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid password"
+            detail="Invalid email or password"
         )
+
+    token = create_session(user.id)
     response = JSONResponse(content={"message": "Login successful"})
     set_session_cookie(response, token)
     return response
@@ -85,7 +124,7 @@ async def logout():
 async def create_item(
     item_data: ItemCreate,
     db: Session = Depends(get_db),
-    _: bool = Depends(get_current_user)
+    user_id: int = Depends(get_current_user_id)
 ):
     """Create a new item from a URL."""
     # Scrape metadata
@@ -96,7 +135,8 @@ async def create_item(
         url=item_data.url,
         title=metadata["title"] or "Untitled",
         summary=metadata["description"],
-        source_type=metadata["source_type"]
+        source_type=metadata["source_type"],
+        user_id=user_id
     )
 
     db.add(item)
@@ -113,10 +153,10 @@ async def list_items(
     date_to: Optional[str] = None,
     date: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: bool = Depends(get_current_user)
+    user_id: int = Depends(get_current_user_id)
 ):
     """List all items with optional filters."""
-    query = db.query(Item)
+    query = db.query(Item).filter(Item.user_id == user_id)
 
     # Apply status filter
     if status_filter == "pending":
@@ -128,9 +168,7 @@ async def list_items(
     if date:
         try:
             target_date = datetime.strptime(date, "%Y-%m-%d")
-            next_day = datetime.strptime(date, "%Y-%m-%d")
-            from datetime import timedelta
-            next_day = next_day + timedelta(days=1)
+            next_day = target_date + timedelta(days=1)
             query = query.filter(Item.captured_at >= target_date, Item.captured_at < next_day)
         except ValueError:
             pass
@@ -162,18 +200,13 @@ async def list_items(
 @app.get("/api/items/dates")
 async def get_item_dates(
     db: Session = Depends(get_db),
-    _: bool = Depends(get_current_user)
+    user_id: int = Depends(get_current_user_id)
 ):
     """Get all dates that have items (for calendar view)."""
-    from sqlalchemy import func
-    from datetime import timedelta
-
-    # Query distinct dates from captured_at
-    items = db.query(Item).all()
+    items = db.query(Item).filter(Item.user_id == user_id).all()
 
     dates = set()
     for item in items:
-        # Get just the date part (YYYY-MM-DD)
         date_str = item.captured_at.strftime("%Y-%m-%d")
         dates.add(date_str)
 
@@ -183,12 +216,13 @@ async def get_item_dates(
 @app.get("/api/items/stats")
 async def get_item_stats(
     db: Session = Depends(get_db),
-    _: bool = Depends(get_current_user)
+    user_id: int = Depends(get_current_user_id)
 ):
     """Get item counts by status."""
-    total = db.query(Item).count()
-    pending = db.query(Item).filter(Item.completed == False).count()
-    completed = db.query(Item).filter(Item.completed == True).count()
+    query = db.query(Item).filter(Item.user_id == user_id)
+    total = query.count()
+    pending = query.filter(Item.completed == False).count()
+    completed = query.filter(Item.completed == True).count()
 
     return {"total": total, "pending": pending, "completed": completed}
 
@@ -198,10 +232,10 @@ async def update_item(
     item_id: int,
     update_data: ItemUpdate,
     db: Session = Depends(get_db),
-    _: bool = Depends(get_current_user)
+    user_id: int = Depends(get_current_user_id)
 ):
     """Update an item (toggle completion)."""
-    item = db.query(Item).filter(Item.id == item_id).first()
+    item = db.query(Item).filter(Item.id == item_id, Item.user_id == user_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -219,10 +253,10 @@ async def update_item(
 async def delete_item(
     item_id: int,
     db: Session = Depends(get_db),
-    _: bool = Depends(get_current_user)
+    user_id: int = Depends(get_current_user_id)
 ):
     """Delete an item."""
-    item = db.query(Item).filter(Item.id == item_id).first()
+    item = db.query(Item).filter(Item.id == item_id, Item.user_id == user_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
