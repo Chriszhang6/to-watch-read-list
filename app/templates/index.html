@@ -217,7 +217,256 @@
                     this.fetchItems();
                     this.fetchItemDates();
                     this.fetchStats();
+
+                    // Update selectedDateItems if in calendar mode
+                    if (this.viewMode === 'calendar' && this.selectedDate) {
+                        url = `/api/items?date=${this.selectedDate}`;
+                        const data = await response.json();
+                        this.items = data.items;
+
+                        // Update selectedDateItems if in calendar mode
+                        if (this.viewMode === 'calendar' && this.selectedDate) {
+                            this.selectedDateItems = this.items;
+                        }
+
+                    } catch (error) {
+                        console.error('Failed to fetch items:', error);
+                    }
                 },
+
+                async addItem() {
+                    if (!this.newUrl || this.isLoading) return;
+
+                    this.isLoading = true;
+                    try {
+                        const response = await fetch('/api/items', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: this.newUrl }),
+                        });
+
+                        if (response.ok) {
+                            this.newUrl = '';
+                            await this.fetchItems();
+                            await this.fetchItemDates();
+                            await this.fetchStats();
+                        } else if (response.status === 401) {
+                            window.location.href = '/login';
+                        } else {
+                            const data = await response.json();
+                            alert(data.detail || 'Failed to add');
+                        }
+                    } catch (error) {
+                        alert('Network error,请重试');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async toggleComplete(item) {
+                    try {
+                        const response = await fetch(`/api/items/${item.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ completed: !item.completed }),
+                        });
+
+                        if (response.ok) {
+                            await this.fetchItems();
+                            await this.fetchItemDates();
+                            await this.fetchStats();
+                        } else if (response.status === 401) {
+                            window.location.href = '/login';
+                        }
+                    } catch (error) {
+                        console.error('Failed to toggle item:', error);
+                    }
+                },
+
+                async deleteItem(id) {
+                    if (!confirm('Delete this item?')) return;
+
+                    try {
+                        const response = await fetch(`/api/items/${id}`, {
+                            method: 'DELETE',
+                        });
+
+                        if (response.ok) {
+                            await this.fetchItems();
+                            await this.fetchItemDates();
+                            await this.fetchStats();
+                        } else if (response.status === 401) {
+                            window.location.href = '/login';
+                        }
+                    } catch (error) {
+                        console.error('Failed to delete item:', error);
+                    }
+                },
+
+                async setStatusFilter(status) {
+                    this.statusFilter = status;
+                    await this.fetchItems();
+                },
+
+                async logout() {
+                    try {
+                        await fetch('/api/logout', { method: 'POST' });
+                        window.location.href = '/login';
+                    } catch (error) {
+                        console.error('Failed to logout:', error);
+                    }
+                },
+
+                getDomain(url) {
+                    try {
+                        return new URL(url).hostname;
+                    } catch {
+                        return url;
+                    }
+                },
+
+                formatDate(dateStr) {
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                },
+
+                get groupedItems() {
+                    const groups = {};
+                    this.items.forEach(item => {
+                        const date = this.formatDate(item.captured_at);
+                        if (!groups[date]) {
+                            groups[date] = [];
+                        }
+                        groups[date].push(item);
+                    });
+                    return groups;
+                },
+
+                get pendingCount() {
+                    return this.items.filter(item => !item.completed).length;
+                }
+
+=======
+                get groupedItems() {
+                    const groups = {};
+                    this.items.forEach(item => {
+                        const date = this.formatDate(item.captured_at);
+                        if (!groups[date]) {
+                            groups[date] = [];
+                        }
+                        groups[date].push(item);
+                    });
+                    return groups;
+                },
+
+                get pendingCount() {
+                    return this.items.filter(item => !item.completed).length;
+                },
+
+                // Calendar methods
+                get calendarTitle() {
+                    return new Date(this.currentYear, this.currentMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                },
+
+                get calendarDays() {
+                    const days = [];
+                    const firstDay = new Date(this.currentYear, this.currentMonth, 1);
+                    const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
+                    const startPadding = firstDay.getDay();
+                    const totalDays = lastDay.getDate();
+
+                    // Previous month padding
+                    const prevMonth = new Date(this.currentYear, this.currentMonth, 0);
+                    for (let i = startPadding - 1; i >= 0; i--) {
+                        const day = prevMonth.getDate() - i;
+                        const date = this.formatDateStandard(prevMonth.getFullYear(), prevMonth.getMonth(), day);
+                        days.push({
+                            day: day,
+                            date: date,
+                            currentMonth: false,
+                            hasItems: this.hasItemsOnDate(date)
+                        });
+                    }
+
+                    // Current month days
+                    for (let i = 1; i <= totalDays; i++) {
+                        const date = this.formatDateStandard(this.currentYear, this.currentMonth, i);
+                        days.push({
+                            day: i,
+                            date: date,
+                            currentMonth: true,
+                            hasItems: this.hasItemsOnDate(date)
+                        });
+                    }
+
+                    // Next month padding
+                    const remaining = 42 - days.length; // 6 rows x 7 days
+                    for (let i = 1; i <= remaining; i++) {
+                        const date = this.formatDateStandard(this.currentYear, this.currentMonth + 1, i);
+                        days.push({
+                            day: i,
+                            date: date,
+                            currentMonth: false,
+                            hasItems: this.hasItemsOnDate(date)
+                        });
+                    }
+
+                    return days;
+                },
+
+                formatDateStandard(year, month, day) {
+                    const m = String(month + 1).padStart(2, '0');
+                    const d = String(day).padStart(2, '0');
+                    return `${year}-${m}-${d}`;
+                },
+
+                hasItemsOnDate(dateStr) {
+                    return this.itemDates.includes(dateStr);
+                },
+
+                previousMonth() {
+                    if (this.currentMonth === 0) {
+                        this.currentMonth = 11;
+                        this.currentYear--;
+                    } else {
+                        this.currentMonth--;
+                    }
+                },
+
+                nextMonth() {
+                    if (this.currentMonth === 11) {
+                        this.currentMonth = 0;
+                        this.currentYear++;
+                    } else {
+                        this.currentMonth++;
+                    }
+                },
+
+                async selectDate(day) {
+                    if (!day.currentMonth) return;
+                    this.selectedDate = day.date;
+                    await this.fetchItems();
+                },
+
+                get selectedDateTitle() {
+                    if (!this.selectedDate) return '';
+                    const date = new Date(this.selectedDate);
+                    return date.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+
 
                 async fetchItems() {
                     try {
