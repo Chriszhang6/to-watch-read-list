@@ -1,315 +1,184 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>待看/读清单</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Watchlist</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
+        .calendar-day { min-height: 36px; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen" x-data="app()" x-init="init()">
-    <div class="max-w-4xl mx-auto px-4 py-8">
-        <!-- Header -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <h1 class="text-2xl font-bold text-gray-800">待看/读清单</h1>
-
-                <div class="flex items-center gap-2 flex-wrap">
-                    <!-- View Toggle -->
-                    <div class="flex rounded-md overflow-hidden border border-gray-200">
-                        <button
-                            @click="viewMode = 'list'"
-                            :class="viewMode === 'list' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
-                            class="px-3 py-2 transition font-medium text-sm flex items-center gap-1"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                            </svg>
-                            列表
-                        </button>
-                        <button
-                            @click="viewMode = 'calendar'"
-                            :class="viewMode === 'calendar' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
-                            class="px-3 py-2 transition font-medium text-sm flex items-center gap-1"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            日历
-                        </button>
-                    </div>
-
-                    <span class="text-gray-300">|</span>
-
-                    <button
-                        @click="setStatusFilter('pending')"
-                        :class="statusFilter === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'"
-                        class="px-4 py-2 rounded-md transition font-medium text-sm"
-                    >
-                        待看 (<span x-text="stats.pending"></span>)
+<body class="bg-gray-50 min-h-screen" x-data="app()" x-init="init()">
+    <div class="max-w-lg mx-auto px-3 py-3">
+        <!-- Compact Header -->
+        <div class="flex items-center justify-between mb-3">
+            <h1 class="text-xl font-bold text-gray-800">Watchlist</h1>
+            <div class="flex items-center gap-2">
+                <!-- View Toggle -->
+                <button @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600'" class="p-2 rounded-lg transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                </button>
+                <button @click="viewMode = 'calendar'" :class="viewMode === 'calendar' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600'" class="p-2 rounded-lg transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </button>
+                <button @click="showMenu = !showMenu" class="p-2 bg-gray-200 text-gray-600 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                </button>
+                <!-- Dropdown Menu -->
+                <div x-show="showMenu" x-cloak @click.away="showMenu = false" class="absolute right-3 top-14 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
+                    <button @click="statusFilter = 'pending'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex justify-between">
+                        <span>Pending</span>
+                        <span class="text-gray-400" x-text="stats.pending"></span>
                     </button>
-                    <button
-                        @click="setStatusFilter('completed')"
-                        :class="statusFilter === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'"
-                        class="px-4 py-2 rounded-md transition font-medium text-sm"
-                    >
-                        已完成 (<span x-text="stats.completed"></span>)
+                    <button @click="statusFilter = 'completed'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex justify-between">
+                        <span>Completed</span>
+                        <span class="text-gray-400" x-text="stats.completed"></span>
                     </button>
-                    <button
-                        @click="setStatusFilter('all')"
-                        :class="statusFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'"
-                        class="px-4 py-2 rounded-md transition font-medium text-sm"
-                    >
-                        全部 (<span x-text="stats.total"></span>)
+                    <button @click="statusFilter = 'all'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex justify-between">
+                        <span>All</span>
+                        <span class="text-gray-400" x-text="stats.total"></span>
                     </button>
-                    <button
-                        @click="logout()"
-                        class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 transition font-medium text-sm"
-                    >
-                        退出
-                    </button>
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <button @click="logout(); showMenu = false" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-red-600">Logout</button>
                 </div>
             </div>
         </div>
 
         <!-- Add URL Form -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <form @submit.prevent="addItem()" class="flex flex-col sm:flex-row gap-3">
-                <div class="flex-1 relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
-                    </span>
-                    <input
-                        type="url"
-                        x-model="newUrl"
-                        placeholder="粘贴链接..."
-                        required
-                        class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                        :disabled="isLoading"
-                    >
-                </div>
+        <div class="mb-3">
+            <form @submit.prevent="addItem()" class="flex gap-2">
+                <input
+                    type="url"
+                    x-model="newUrl"
+                    placeholder="Paste link..."
+                    required
+                    class="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    :disabled="isLoading"
+                >
                 <button
                     type="submit"
                     :disabled="isLoading || !newUrl"
-                    class="px-6 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                    <span x-show="!isLoading">添加</span>
-                    <span x-show="isLoading" class="flex items-center gap-2">
-                        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        处理中
-                    </span>
-                </button>
+                    class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium text-sm disabled:bg-gray-300"
+                    x-text="isLoading ? '...' : 'Add'"
+                ></button>
             </form>
         </div>
 
         <!-- Calendar View -->
-        <div x-show="viewMode === 'calendar'" x-cloak class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div x-show="viewMode === 'calendar'" x-cloak class="bg-white rounded-lg shadow-sm p-3 mb-3">
             <!-- Calendar Navigation -->
-            <div class="flex items-center justify-between mb-4">
-                <button
-                    @click="previousMonth()"
-                    class="p-2 hover:bg-gray-100 rounded-md transition"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="flex items-center justify-between mb-2">
+                <button @click="previousMonth()" class="p-1 hover:bg-gray-100 rounded">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <h2 class="text-lg font-semibold text-gray-800" x-text="calendarTitle"></h2>
-                <button
-                    @click="nextMonth()"
-                    class="p-2 hover:bg-gray-100 rounded-md transition"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <span class="text-sm font-medium text-gray-700" x-text="calendarTitle"></span>
+                <button @click="nextMonth()" class="p-1 hover:bg-gray-100 rounded">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
                 </button>
             </div>
 
             <!-- Calendar Grid -->
-            <div class="grid grid-cols-7 gap-1">
-                <!-- Weekday Headers -->
-                <template x-for="day in ['日', '一', '二', '三', '四', '五', '六']" :key="day">
-                    <div class="text-center text-sm font-medium text-gray-500 py-2" x-text="day"></div>
+            <div class="grid grid-cols-7 gap-0.5">
+                <template x-for="day in ['S', 'M', 'T', 'W', 'T', 'F', 'S']" :key="day">
+                    <div class="text-center text-xs text-gray-400 py-1" x-text="day"></div>
                 </template>
 
-                <!-- Calendar Days -->
                 <template x-for="(day, index) in calendarDays" :key="index">
                     <div
-                        class="min-h-[60px] p-1 border border-gray-100 rounded-md transition cursor-pointer"
+                        class="calendar-day flex flex-col items-center justify-center rounded cursor-pointer text-xs"
                         :class="{
-                            'bg-gray-50': !day.currentMonth,
-                            'bg-blue-50': day.hasItems && day.currentMonth,
-                            'ring-2 ring-blue-500': day.date === selectedDate,
-                            'hover:bg-blue-100': day.currentMonth
+                            'text-gray-300': !day.currentMonth,
+                            'text-gray-700': day.currentMonth && day.date !== selectedDate,
+                            'bg-blue-500 text-white': day.date === selectedDate,
+                            'hover:bg-gray-100': day.currentMonth && day.date !== selectedDate
                         }"
                         @click="selectDate(day)"
                     >
-                        <div
-                            class="text-sm font-medium"
-                            :class="{
-                                'text-gray-300': !day.currentMonth,
-                                'text-gray-700': day.currentMonth && day.date !== selectedDate,
-                                'text-blue-600': day.date === selectedDate
-                            }"
-                            x-text="day.day"
-                        ></div>
-                        <div x-show="day.hasItems" class="flex justify-center mt-1">
-                            <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
-                        </div>
+                        <span x-text="day.day"></span>
+                        <span x-show="day.hasItems && day.date !== selectedDate" class="w-1 h-1 bg-blue-500 rounded-full mt-0.5"></span>
                     </div>
                 </template>
             </div>
 
             <!-- Selected Date Items -->
-            <div x-show="selectedDateItems.length > 0" class="mt-6 pt-6 border-t border-gray-200">
-                <h3 class="text-md font-semibold text-gray-700 mb-3" x-text="selectedDateTitle"></h3>
-                <div class="space-y-3">
-                    <template x-for="item in selectedDateItems" :key="item.id">
-                        <div class="bg-gray-50 rounded-lg p-3 transition hover:bg-gray-100">
-                            <div class="flex items-start gap-3">
-                                <button
-                                    @click="toggleComplete(item)"
-                                    class="mt-0.5 flex-shrink-0"
-                                    :class="item.completed ? 'text-green-500' : 'text-gray-300 hover:text-green-500'"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path x-show="!item.completed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        <path x-show="item.completed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" fill="currentColor" />
-                                    </svg>
-                                </button>
-
-                                <div class="flex-1 min-w-0">
-                                    <a
-                                        :href="item.url"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="block"
-                                    >
-                                        <h4
-                                            class="font-medium text-gray-800 hover:text-blue-500 transition text-sm"
-                                            :class="item.completed ? 'line-through text-gray-400' : ''"
-                                            x-text="item.title || '无标题'"
-                                        ></h4>
-                                    </a>
-                                    <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                                        <span
-                                            class="px-1.5 py-0.5 rounded text-xs font-medium"
-                                            :class="{
-                                                'bg-red-100 text-red-700': item.source_type === 'youtube',
-                                                'bg-blue-100 text-blue-700': item.source_type === 'article',
-                                                'bg-gray-100 text-gray-700': item.source_type === 'other'
-                                            }"
-                                            x-text="item.source_type === 'youtube' ? 'YouTube' : item.source_type === 'article' ? '文章' : '其他'"
-                                        ></span>
-                                    </div>
-                                </div>
-
-                                <div class="flex-shrink-0 flex gap-1">
-                                    <button
-                                        @click="toggleComplete(item)"
-                                        class="text-xs px-2 py-1 rounded transition"
-                                        :class="item.completed ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-green-100 text-green-700 hover:bg-green-200'"
-                                        x-text="item.completed ? '撤销' : '完成'"
-                                    ></button>
-                                    <button
-                                        @click="deleteItem(item.id)"
-                                        class="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition"
-                                    >
-                                        删除
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
+            <div x-show="selectedDateItems.length > 0" class="mt-3 pt-3 border-t border-gray-100 space-y-2 max-h-48 overflow-y-auto">
+                <template x-for="item in selectedDateItems" :key="item.id">
+                    <div class="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                        <button @click="toggleComplete(item)" :class="item.completed ? 'text-green-500' : 'text-gray-300'">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </button>
+                        <a :href="item.url" target="_blank" class="flex-1 text-sm truncate" :class="item.completed ? 'text-gray-400 line-through' : 'text-gray-700'" x-text="item.title || 'Untitled'"></a>
+                        <button @click="deleteItem(item.id)" class="text-gray-300 hover:text-red-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </template>
             </div>
 
-            <div x-show="selectedDate && selectedDateItems.length === 0" class="mt-6 pt-6 border-t border-gray-200 text-center text-gray-500 text-sm">
-                该日期没有条目
+            <div x-show="selectedDate && selectedDateItems.length === 0" class="mt-3 pt-3 border-t border-gray-100 text-center text-xs text-gray-400">
+                No items on this date
             </div>
         </div>
 
-        <!-- Items List (List View) -->
-        <div x-show="viewMode === 'list'" class="space-y-6">
+        <!-- Items List -->
+        <div x-show="viewMode === 'list'" class="space-y-2">
             <template x-for="(group, date) in groupedItems" :key="date">
                 <div>
-                    <h2 class="text-lg font-semibold text-gray-600 mb-3 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span x-text="date"></span>
-                    </h2>
-
-                    <div class="space-y-3">
+                    <div class="text-xs font-medium text-gray-400 mb-1 px-1" x-text="date"></div>
+                    <div class="space-y-1">
                         <template x-for="item in group" :key="item.id">
-                            <div class="bg-white rounded-lg shadow-md p-4 transition hover:shadow-lg">
-                                <div class="flex items-start gap-3">
+                            <div class="bg-white rounded-lg p-3 shadow-sm">
+                                <div class="flex items-start gap-2">
                                     <button
                                         @click="toggleComplete(item)"
-                                        class="mt-1 flex-shrink-0"
+                                        class="mt-0.5 flex-shrink-0"
                                         :class="item.completed ? 'text-green-500' : 'text-gray-300 hover:text-green-500'"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path x-show="!item.completed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            <path x-show="item.completed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" fill="currentColor" />
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" :fill="item.completed ? 'currentColor' : 'none'" />
                                         </svg>
                                     </button>
 
                                     <div class="flex-1 min-w-0">
-                                        <a
-                                            :href="item.url"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="block"
-                                        >
-                                            <h3
-                                                class="font-medium text-gray-800 hover:text-blue-500 transition"
-                                                :class="item.completed ? 'line-through text-gray-400' : ''"
-                                                x-text="item.title || '无标题'"
-                                            ></h3>
+                                        <a :href="item.url" target="_blank" class="block">
+                                            <div class="text-sm font-medium truncate" :class="item.completed ? 'text-gray-400 line-through' : 'text-gray-800'" x-text="item.title || 'Untitled'"></div>
                                         </a>
-
-                                        <div class="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                                        <div class="flex items-center gap-2 mt-0.5">
                                             <span
-                                                class="px-2 py-0.5 rounded text-xs font-medium"
+                                                class="text-xs px-1.5 py-0.5 rounded"
                                                 :class="{
-                                                    'bg-red-100 text-red-700': item.source_type === 'youtube',
-                                                    'bg-blue-100 text-blue-700': item.source_type === 'article',
-                                                    'bg-gray-100 text-gray-700': item.source_type === 'other'
+                                                    'bg-red-50 text-red-600': item.source_type === 'youtube',
+                                                    'bg-blue-50 text-blue-600': item.source_type === 'article',
+                                                    'bg-gray-100 text-gray-500': item.source_type === 'other'
                                                 }"
-                                                x-text="item.source_type === 'youtube' ? 'YouTube' : item.source_type === 'article' ? '文章' : '其他'"
+                                                x-text="item.source_type === 'youtube' ? 'YouTube' : item.source_type === 'article' ? 'Article' : 'Link'"
                                             ></span>
-                                            <span x-text="getDomain(item.url)"></span>
+                                            <span class="text-xs text-gray-400 truncate" x-text="getDomain(item.url)"></span>
                                         </div>
-
-                                        <p
-                                            class="text-sm text-gray-600 mt-2 line-clamp-2"
-                                            x-text="item.summary"
-                                        ></p>
                                     </div>
 
-                                    <div class="flex-shrink-0 flex gap-2">
-                                        <button
-                                            @click="toggleComplete(item)"
-                                            class="text-sm px-3 py-1 rounded transition"
-                                            :class="item.completed ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-green-100 text-green-700 hover:bg-green-200'"
-                                            x-text="item.completed ? '撤销' : '完成'"
-                                        ></button>
-                                        <button
-                                            @click="deleteItem(item.id)"
-                                            class="text-sm px-3 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition"
-                                        >
-                                            删除
-                                        </button>
-                                    </div>
+                                    <button @click="deleteItem(item.id)" class="text-gray-300 hover:text-red-500 p-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         </template>
@@ -318,12 +187,12 @@
             </template>
 
             <!-- Empty State -->
-            <div x-show="items.length === 0 && !isLoading" class="bg-white rounded-lg shadow-md p-12 text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <div x-show="items.length === 0 && !isLoading" class="text-center py-12 text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <p class="text-gray-500">还没有添加任何链接</p>
-                <p class="text-gray-400 text-sm mt-1">在上方粘贴链接开始吧</p>
+                <p class="text-sm">No items yet</p>
+                <p class="text-xs mt-1">Paste a link above to get started</p>
             </div>
         </div>
     </div>
@@ -342,6 +211,7 @@
                 itemDates: [],
                 selectedDateItems: [],
                 stats: { total: 0, pending: 0, completed: 0 },
+                showMenu: false,
 
                 init() {
                     this.fetchItems();
@@ -363,7 +233,6 @@
                         const data = await response.json();
                         this.items = data.items;
 
-                        // Update selectedDateItems if in calendar mode
                         if (this.viewMode === 'calendar' && this.selectedDate) {
                             this.selectedDateItems = this.items;
                         }
@@ -416,10 +285,10 @@
                             window.location.href = '/login';
                         } else {
                             const data = await response.json();
-                            alert(data.detail || '添加失败');
+                            alert(data.detail || 'Failed to add');
                         }
                     } catch (error) {
-                        alert('网络错误，请重试');
+                        alert('Network error');
                     } finally {
                         this.isLoading = false;
                     }
@@ -435,7 +304,6 @@
 
                         if (response.ok) {
                             await this.fetchItems();
-                            await this.fetchItemDates();
                             await this.fetchStats();
                         } else if (response.status === 401) {
                             window.location.href = '/login';
@@ -446,7 +314,7 @@
                 },
 
                 async deleteItem(id) {
-                    if (!confirm('确定要删除这个条目吗？')) return;
+                    if (!confirm('Delete this item?')) return;
 
                     try {
                         const response = await fetch(`/api/items/${id}`, {
@@ -463,11 +331,6 @@
                     } catch (error) {
                         console.error('Failed to delete item:', error);
                     }
-                },
-
-                async setStatusFilter(status) {
-                    this.statusFilter = status;
-                    await this.fetchItems();
                 },
 
                 async logout() {
@@ -489,10 +352,10 @@
 
                 formatDate(dateStr) {
                     const date = new Date(dateStr);
-                    return date.toLocaleDateString('zh-CN', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit'
+                    return date.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
                     });
                 },
 
@@ -508,9 +371,8 @@
                     return groups;
                 },
 
-                // Calendar methods
                 get calendarTitle() {
-                    return `${this.currentYear}年${this.currentMonth + 1}月`;
+                    return new Date(this.currentYear, this.currentMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
                 },
 
                 get calendarDays() {
@@ -520,40 +382,22 @@
                     const startPadding = firstDay.getDay();
                     const totalDays = lastDay.getDate();
 
-                    // Previous month padding
                     const prevMonth = new Date(this.currentYear, this.currentMonth, 0);
                     for (let i = startPadding - 1; i >= 0; i--) {
                         const day = prevMonth.getDate() - i;
                         const date = this.formatDateStandard(prevMonth.getFullYear(), prevMonth.getMonth(), day);
-                        days.push({
-                            day: day,
-                            date: date,
-                            currentMonth: false,
-                            hasItems: this.hasItemsOnDate(date)
-                        });
+                        days.push({ day, date, currentMonth: false, hasItems: this.hasItemsOnDate(date) });
                     }
 
-                    // Current month days
                     for (let i = 1; i <= totalDays; i++) {
                         const date = this.formatDateStandard(this.currentYear, this.currentMonth, i);
-                        days.push({
-                            day: i,
-                            date: date,
-                            currentMonth: true,
-                            hasItems: this.hasItemsOnDate(date)
-                        });
+                        days.push({ day: i, date, currentMonth: true, hasItems: this.hasItemsOnDate(date) });
                     }
 
-                    // Next month padding
-                    const remaining = 42 - days.length; // 6 rows x 7 days
+                    const remaining = 42 - days.length;
                     for (let i = 1; i <= remaining; i++) {
                         const date = this.formatDateStandard(this.currentYear, this.currentMonth + 1, i);
-                        days.push({
-                            day: i,
-                            date: date,
-                            currentMonth: false,
-                            hasItems: this.hasItemsOnDate(date)
-                        });
+                        days.push({ day: i, date, currentMonth: false, hasItems: this.hasItemsOnDate(date) });
                     }
 
                     return days;
@@ -591,16 +435,6 @@
                     if (!day.currentMonth) return;
                     this.selectedDate = day.date;
                     await this.fetchItems();
-                },
-
-                get selectedDateTitle() {
-                    if (!this.selectedDate) return '';
-                    const date = new Date(this.selectedDate);
-                    return date.toLocaleDateString('zh-CN', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    });
                 }
             }
         }
