@@ -13,16 +13,20 @@ from .database import get_db, init_db, engine, Base
 from .models import Item, User
 from .schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse,
-    LoginRequest, RegisterRequest, MessageResponse
+    LoginRequest, RegisterRequest, MessageResponse,
+    ForgotPasswordRequest, ResetPasswordRequest
 )
 from .auth import (
     create_session, verify_session, get_current_user, get_current_user_id,
     set_session_cookie, clear_session_cookie, SESSION_COOKIE_NAME,
-    authenticate_user, create_user, get_user_by_email
+    authenticate_user, create_user, get_user_by_email, hash_password
 )
-from .services.scraper import scrape_url
+import secrets
+import uuid
+from datetime import datetime, timedelta
 
-load_dotenv()
+from .services.scraper import scrape_url
+from .services.email import send_password_reset_email
 
 app = FastAPI(title="Watchlist", version="2.0.0")
 
@@ -61,13 +65,22 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(request: Request):
-    """Render the registration page."""
+@app.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    """Render the forgot password page."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if token and verify_session(token):
         return RedirectResponse(url="/", status_code=302)
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse("forgot_password.html", {"request": request})
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request):
+    """Render the reset password page."""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if token and verify_session(token):
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse("reset_password.html", {"request": request})
 
 
 # Auth API Routes
@@ -249,25 +262,74 @@ async def update_item(
     return item
 
 
-@app.delete("/api/items/{item_id}")
-async def delete_item(
-    item_id: int,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
-):
-    """Delete an item."""
-    item = db.query(Item).filter(Item.id == item_id, Item.user_id == user_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
+# Forgot Password API Routes
+@app.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    """Render the forgot password page."""
+    return templates.TemplateResponse("forgot_password.html", {"request": request})
 
-    db.delete(item)
+
+@app.post("/api/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """Handle forgot password request."""
+    user = get_user_by_email(db, request.email)
+    if not user:
+        # Don't reveal if email exists (for security)
+        return {"message": "If that email exists, a reset link has been sent."}
+
+    # Invalidate any existing reset tokens for this user
+    db.query(PasswordReset).filter(PasswordReset.user_id == user.id).delete()
+
+    # Create reset token
+    reset_token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=1)
+
+    password_reset = PasswordReset(
+        token=reset_token,
+        user_id=user.id,
+        expires_at=expires_at
+    )
+    db.add(password_reset)
     db.commit()
 
-    return {"message": "Item deleted successfully"}
+    # Send email
+    reset_url = f"{request.url}/reset-password"
+    send_password_reset_email(user.email, reset_token, reset_url)
+
+    return {"message": "If that email exists, a reset link has been sent"}
 
 
-# Health check
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy"}
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request):
+    """Render the reset password page."""
+    return templates.TemplateResponse("reset_password.html", {"request": request})
+
+
+@app.post("/api/reset-password", response_model=MessageResponse)
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """Handle reset password request."""
+    # Verify token
+    password_reset = db.query(PasswordReset).filter(
+        PasswordReset.token == request.token,
+        PasswordReset.used == False
+    ).first()
+
+    if not password_reset or password_reset.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+
+    # Update password
+    user.hashed_password = hash_password(request.password)
+    password_reset.used = True
+
+    db.commit()
+
+    return {"message": "Password reset successful"}
