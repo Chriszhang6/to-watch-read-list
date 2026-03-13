@@ -141,7 +141,10 @@ async def create_item(
 ):
     """Create a new item from a URL."""
     # Scrape metadata
-    metadata = await scrape_url(item_data.url)
+    try:
+        metadata = await scrape_url(item_data.url)
+    except Exception:
+        metadata = {"title": None, "description": None, "source_type": "other"}
 
     # Create item
     item = Item(
@@ -260,6 +263,23 @@ async def update_item(
     db.refresh(item)
 
     return item
+
+
+@app.delete("/api/items/{item_id}")
+async def delete_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """Delete an item."""
+    item = db.query(Item).filter(Item.id == item_id, Item.user_id == user_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    db.delete(item)
+    db.commit()
+
+    return {"message": "Item deleted"}
 
 
 # Forgot Password API Routes
