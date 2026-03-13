@@ -70,3 +70,24 @@ class UserResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+    @field_validator('email')
+    @classmethod
+    def email_to_lower(cls, v):
+        return v.lower()
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+    @field_validator('password')
+    @classmethod
+    def password_must_be_strong(cls, v):
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters')
+        return v

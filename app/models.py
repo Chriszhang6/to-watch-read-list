@@ -13,6 +13,20 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     items = relationship("Item", back_populates="owner")
+    password_resets = relationship("PasswordReset", back_populates="user")
+
+
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String, unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="password_resets")
 
 
 class Item(Base):
