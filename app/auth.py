@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from typing import Optional
+from dotenv import load_dotenv
 from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .models import User
 
+load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
