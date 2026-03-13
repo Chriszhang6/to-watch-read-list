@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 from .database import get_db, init_db, engine, Base
-from .models import Item, User
+from .models import Item, User, PasswordReset
 from .schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse,
     LoginRequest, RegisterRequest, MessageResponse,
