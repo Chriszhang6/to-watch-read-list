@@ -7,19 +7,30 @@ logger = logging.getLogger(__name__)
 # Check if SendGrid is configured
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@example.com")
+USE_MOCK_EXTERNAL = os.getenv("USE_MOCK_EXTERNAL", "false").lower() == "true"
 
 
 def send_password_reset_email(email: str, reset_token: str, reset_url: str) -> bool:
     """
     Send password reset email.
-    In development (no SENDGRID_API_KEY), just logs the reset link.
+    - Production: SendGrid API
+    - Development without SendGrid: Print to console for testing
+    - Development with USE_MOCK_EXTERNAL: Log with clear [MOCK] prefix
     """
     full_reset_url = f"{reset_url}?token={reset_token}"
 
     if not SENDGRID_API_KEY:
-        # Development mode - just log the link
-        logger.info(f"[DEV] Password reset link for {email}: {full_reset_url}")
-        print(f"\n[DEV MODE] Password reset link: {full_reset_url}\n")
+        # Development/Mock mode
+        dev_msg = f"[MOCK] Password reset link for {email}: {full_reset_url}"
+        logger.info(dev_msg)
+        # Also print for immediate visibility in development
+        print(f"\n{'='*80}")
+        print(f"🔐 PASSWORD RESET EMAIL (Development Mode - Not Sent)")
+        print(f"{'='*80}")
+        print(f"To: {email}")
+        print(f"Reset Link: {full_reset_url}")
+        print(f"Token expires in: 1 hour")
+        print(f"{'='*80}\n")
         return True
 
     # Production mode - send via SendGrid
@@ -50,6 +61,7 @@ def send_password_reset_email(email: str, reset_token: str, reset_url: str) -> b
         )
 
         response = sg.send(message)
+        logger.info(f"Password reset email sent to {email}")
         return response.status_code == 202
 
     except Exception as e:

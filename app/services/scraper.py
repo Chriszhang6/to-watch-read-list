@@ -1,12 +1,15 @@
 import os
 import httpx
+import logging
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, Dict
 import re
 
+logger = logging.getLogger(__name__)
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+USE_MOCK_EXTERNAL = os.getenv("USE_MOCK_EXTERNAL", "false").lower() == "true"
 
 
 async def fetch_page_content(url: str) -> str:
@@ -77,6 +80,13 @@ async def fetch_youtube_metadata(url: str) -> Optional[Dict[str, Optional[str]]]
 async def fetch_youtube_data_api(url: str) -> Optional[Dict[str, Optional[str]]]:
     """Fetch YouTube video metadata using YouTube Data API v3."""
     if not YOUTUBE_API_KEY:
+        if USE_MOCK_EXTERNAL:
+            logger.info(f"[MOCK] YouTube API key not set, returning mock data for {url}")
+            return {
+                "title": "[Mock] Sample YouTube Video Title",
+                "description": "[Mock] This is a sample video description. In production, this would come from YouTube Data API.",
+                "source_type": "youtube"
+            }
         return None
 
     video_id = extract_youtube_video_id(url)
@@ -103,7 +113,8 @@ async def fetch_youtube_data_api(url: str) -> Optional[Dict[str, Optional[str]]]
                         "description": snippet.get("description"),
                         "source_type": "youtube"
                     }
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching from YouTube API: {str(e)}")
         pass
 
     return None

@@ -30,12 +30,16 @@ from .services.email import send_password_reset_email
 
 app = FastAPI(title="Watchlist", version="2.0.0")
 
+# CORS configuration - more restrictive for security
+# In production, set allowed origins to your actual domain
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 templates = Jinja2Templates(directory="app/templates")
