@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_, func
 from dotenv import load_dotenv
 
 from .database import get_db, init_db, engine, Base
@@ -185,16 +186,16 @@ async def list_items(
     elif status_filter == "completed":
         query = query.filter(Item.completed == True)
 
-    # Apply single date filter (for calendar view) - use local_date
+    # Apply single date filter (for calendar view)
+    # Use local_date if available, otherwise fall back to captured_at date
     if date:
-        query = query.filter(Item.local_date == date)
-    else:
-        # Apply date range filters - use local_date
-        if date_from:
-            query = query.filter(Item.local_date >= date_from)
-
-        if date_to:
-            query = query.filter(Item.local_date <= date_to)
+        from sqlalchemy import or_, func
+        query = query.filter(
+            or_(
+                Item.local_date == date,
+                and_(Item.local_date == None, func.date(Item.captured_at) == date)
+            )
+        )
 
     # Order by captured_at descending
     query = query.order_by(Item.captured_at.desc())
