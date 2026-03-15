@@ -38,6 +38,7 @@ class Item(Base):
     summary = Column(Text, nullable=True)
     source_type = Column(String, default="other")  # youtube, article, other
     captured_at = Column(DateTime, default=datetime.utcnow)
+    local_date = Column(String, nullable=True)  # YYYY-MM-DD format for user's local date
     completed = Column(Boolean, default=False)
     completed_at = Column(DateTime, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

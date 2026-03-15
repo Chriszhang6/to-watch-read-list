@@ -270,10 +270,14 @@
 
                     this.isLoading = true;
                     try {
+                        // Get user's local date in YYYY-MM-DD format
+                        const today = new Date();
+                        const localDate = today.toISOString().split('T')[0];
+
                         const response = await fetch('/api/items', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ url: this.newUrl }),
+                            body: JSON.stringify({ url: this.newUrl, local_date: localDate }),
                         });
 
                         if (response.ok) {
@@ -362,7 +366,19 @@
                 get groupedItems() {
                     const groups = {};
                     this.items.forEach(item => {
-                        const date = this.formatDate(item.captured_at);
+                        // Use local_date if available, otherwise format captured_at
+                        let date;
+                        if (item.local_date) {
+                            const parts = item.local_date.split('-');
+                            date = new Date(parts[0], parts[1] - 1, parts[2]);
+                            date = date.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                            });
+                        } else {
+                            date = this.formatDate(item.captured_at);
+                        }
                         if (!groups[date]) {
                             groups[date] = [];
                         }

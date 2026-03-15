@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 class ItemCreate(BaseModel):
     url: str
+    local_date: Optional[str] = None  # YYYY-MM-DD format from client
 
 
 class ItemUpdate(BaseModel):
@@ -20,6 +21,7 @@ class ItemResponse(BaseModel):
     captured_at: datetime
     completed: bool
     completed_at: Optional[datetime]
+    local_date: Optional[str] = None  # YYYY-MM-DD format
 
     class Config:
         from_attributes = True

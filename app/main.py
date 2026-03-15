@@ -156,7 +156,8 @@ async def create_item(
         title=metadata["title"] or "Untitled",
         summary=metadata["description"],
         source_type=metadata["source_type"],
-        user_id=user_id
+        user_id=user_id,
+        local_date=item_data.local_date  # Store client's local date
     )
 
     db.add(item)
@@ -184,29 +185,16 @@ async def list_items(
     elif status_filter == "completed":
         query = query.filter(Item.completed == True)
 
-    # Apply single date filter (for calendar view)
+    # Apply single date filter (for calendar view) - use local_date
     if date:
-        try:
-            target_date = datetime.strptime(date, "%Y-%m-%d")
-            next_day = target_date + timedelta(days=1)
-            query = query.filter(Item.captured_at >= target_date, Item.captured_at < next_day)
-        except ValueError:
-            pass
+        query = query.filter(Item.local_date == date)
     else:
-        # Apply date range filters
+        # Apply date range filters - use local_date
         if date_from:
-            try:
-                from_date = datetime.strptime(date_from, "%Y-%m-%d")
-                query = query.filter(Item.captured_at >= from_date)
-            except ValueError:
-                pass
+            query = query.filter(Item.local_date >= date_from)
 
         if date_to:
-            try:
-                to_date = datetime.strptime(date_to, "%Y-%m-%d")
-                query = query.filter(Item.captured_at <= to_date)
-            except ValueError:
-                pass
+            query = query.filter(Item.local_date <= date_to)
 
     # Order by captured_at descending
     query = query.order_by(Item.captured_at.desc())
@@ -227,8 +215,12 @@ async def get_item_dates(
 
     dates = set()
     for item in items:
-        date_str = item.captured_at.strftime("%Y-%m-%d")
-        dates.add(date_str)
+        # Use local_date if available, otherwise fall back to captured_at
+        if item.local_date:
+            dates.add(item.local_date)
+        else:
+            date_str = item.captured_at.strftime("%Y-%m-%d")
+            dates.add(date_str)
 
     return {"dates": sorted(list(dates), reverse=True)}
 
