@@ -287,9 +287,11 @@
 
                     this.isLoading = true;
                     try {
-                        // Get user's local date in YYYY-MM-DD format
+                        // Get user's local date in YYYY-MM-DD format (using local timezone, not UTC)
                         const today = new Date();
-                        const localDate = today.toISOString().split('T')[0];
+                        const localDate = today.getFullYear() + '-' +
+                            String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                            String(today.getDate()).padStart(2, '0');
 
                         const response = await fetch('/api/items', {
                             method: 'POST',
