@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" :class="{ 'dark': darkMode }">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,9 +7,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
-            darkMode: 'class',
-            darkTheme: 'class'
+            darkMode: 'class'
         }
+        // Apply theme before page renders to avoid flash
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
@@ -232,16 +238,8 @@
                 darkMode: false,
 
                 init() {
-                    // Load theme preference
-                    const savedTheme = localStorage.getItem('theme');
-                    if (savedTheme === 'dark') {
-                        this.darkMode = true;
-                    } else if (savedTheme === 'light') {
-                        this.darkMode = false;
-                    } else {
-                        // Follow system preference
-                        this.darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    }
+                    // Sync darkMode state with actual DOM state (set by head script)
+                    this.darkMode = document.documentElement.classList.contains('dark');
 
                     this.fetchItems();
                     this.fetchItemDates();
@@ -250,7 +248,13 @@
 
                 toggleTheme() {
                     this.darkMode = !this.darkMode;
-                    localStorage.setItem('theme', this.darkMode ? 'dark' : 'light');
+                    if (this.darkMode) {
+                        document.documentElement.classList.add('dark');
+                        localStorage.setItem('theme', 'dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                        localStorage.setItem('theme', 'light');
+                    }
                 },
 
                 switchToList() {
