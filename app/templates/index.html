@@ -1,54 +1,71 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" :class="{ 'dark': darkMode }">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Watchlist</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            darkTheme: 'class'
+        }
+    </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
         .calendar-day { min-height: 36px; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen" x-data="app()" x-init="init()">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-200" x-data="app()" x-init="init()">
     <div class="max-w-lg mx-auto px-3 py-3">
         <!-- Compact Header -->
         <div class="flex items-center justify-between mb-3">
-            <h1 class="text-xl font-bold text-gray-800">Watchlist</h1>
+            <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">Watchlist</h1>
             <div class="flex items-center gap-2">
+                <!-- Theme Toggle -->
+                <button @click="toggleTheme()" class="p-2 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg transition hover:bg-gray-300 dark:hover:bg-gray-600" title="Toggle theme">
+                    <!-- Sun icon (shown in dark mode) -->
+                    <svg x-show="darkMode" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <!-- Moon icon (shown in light mode) -->
+                    <svg x-show="!darkMode" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
                 <!-- View Toggle -->
-                <button @click="switchToList()" :class="viewMode === 'list' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600'" class="p-2 rounded-lg transition">
+                <button @click="switchToList()" :class="viewMode === 'list' ? 'bg-gray-800 dark:bg-gray-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="p-2 rounded-lg transition">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                     </svg>
                 </button>
-                <button @click="switchToCalendar()" :class="viewMode === 'calendar' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600'" class="p-2 rounded-lg transition">
+                <button @click="switchToCalendar()" :class="viewMode === 'calendar' ? 'bg-gray-800 dark:bg-gray-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="p-2 rounded-lg transition">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                 </button>
-                <button @click="showMenu = !showMenu" class="p-2 bg-gray-200 text-gray-600 rounded-lg">
+                <button @click="showMenu = !showMenu" class="p-2 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                     </svg>
                 </button>
                 <!-- Dropdown Menu -->
-                <div x-show="showMenu" x-cloak @click.away="showMenu = false" class="absolute right-3 top-14 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
-                    <button @click="statusFilter = 'pending'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex justify-between">
+                <div x-show="showMenu" x-cloak @click.away="showMenu = false" class="absolute right-3 top-14 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-100 dark:border-gray-700 py-1 z-50 min-w-[140px]">
+                    <button @click="statusFilter = 'pending'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex justify-between">
                         <span>Pending</span>
-                        <span class="text-gray-400" x-text="stats.pending"></span>
+                        <span class="text-gray-400 dark:text-gray-500" x-text="stats.pending"></span>
                     </button>
-                    <button @click="statusFilter = 'completed'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex justify-between">
+                    <button @click="statusFilter = 'completed'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex justify-between">
                         <span>Completed</span>
-                        <span class="text-gray-400" x-text="stats.completed"></span>
+                        <span class="text-gray-400 dark:text-gray-500" x-text="stats.completed"></span>
                     </button>
-                    <button @click="statusFilter = 'all'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex justify-between">
+                    <button @click="statusFilter = 'all'; showMenu = false; fetchItems()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex justify-between">
                         <span>All</span>
-                        <span class="text-gray-400" x-text="stats.total"></span>
+                        <span class="text-gray-400 dark:text-gray-500" x-text="stats.total"></span>
                     </button>
-                    <div class="border-t border-gray-100 my-1"></div>
-                    <button @click="logout(); showMenu = false" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-red-600">Logout</button>
+                    <div class="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+                    <button @click="logout(); showMenu = false" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-red-600 dark:text-red-400">Logout</button>
                 </div>
             </div>
         </div>
@@ -61,30 +78,30 @@
                     x-model="newUrl"
                     placeholder="Paste link..."
                     required
-                    class="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 outline-none text-sm"
+                    class="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 focus:border-gray-500 dark:focus:border-gray-400 outline-none text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                     :disabled="isLoading"
                 >
                 <button
                     type="submit"
                     :disabled="isLoading || !newUrl"
-                    class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition font-medium text-sm disabled:bg-gray-300"
+                    class="px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-900 dark:hover:bg-gray-500 transition font-medium text-sm disabled:bg-gray-300 dark:disabled:bg-gray-700"
                     x-text="isLoading ? '...' : 'Add'"
                 ></button>
             </form>
         </div>
 
         <!-- Calendar View -->
-        <div x-show="viewMode === 'calendar'" x-cloak class="bg-white rounded-lg shadow-sm p-3 mb-3">
+        <div x-show="viewMode === 'calendar'" x-cloak class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 mb-3">
             <!-- Calendar Navigation -->
             <div class="flex items-center justify-between mb-2">
-                <button @click="previousMonth()" class="p-1 hover:bg-gray-100 rounded">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button @click="previousMonth()" class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <span class="text-sm font-medium text-gray-700" x-text="calendarTitle"></span>
-                <button @click="nextMonth()" class="p-1 hover:bg-gray-100 rounded">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-200" x-text="calendarTitle"></span>
+                <button @click="nextMonth()" class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
                 </button>
@@ -93,37 +110,37 @@
             <!-- Calendar Grid -->
             <div class="grid grid-cols-7 gap-0.5">
                 <template x-for="day in ['S', 'M', 'T', 'W', 'T', 'F', 'S']" :key="day">
-                    <div class="text-center text-xs text-gray-400 py-1" x-text="day"></div>
+                    <div class="text-center text-xs text-gray-400 dark:text-gray-500 py-1" x-text="day"></div>
                 </template>
 
                 <template x-for="(day, index) in calendarDays" :key="index">
                     <div
                         class="calendar-day flex flex-col items-center justify-center rounded cursor-pointer text-xs"
                         :class="{
-                            'text-gray-300': !day.currentMonth,
-                            'text-gray-700': day.currentMonth && day.date !== selectedDate,
-                            'bg-gray-800 text-white': day.date === selectedDate,
-                            'hover:bg-gray-100': day.currentMonth && day.date !== selectedDate
+                            'text-gray-300 dark:text-gray-600': !day.currentMonth,
+                            'text-gray-700 dark:text-gray-300': day.currentMonth && day.date !== selectedDate,
+                            'bg-gray-800 dark:bg-gray-500 text-white': day.date === selectedDate,
+                            'hover:bg-gray-100 dark:hover:bg-gray-700': day.currentMonth && day.date !== selectedDate
                         }"
                         @click="selectDate(day)"
                     >
                         <span x-text="day.day"></span>
-                        <span x-show="day.hasItems && day.date !== selectedDate" class="w-1 h-1 bg-gray-800 rounded-full mt-0.5"></span>
+                        <span x-show="day.hasItems && day.date !== selectedDate" class="w-1 h-1 bg-gray-800 dark:bg-gray-300 rounded-full mt-0.5"></span>
                     </div>
                 </template>
             </div>
 
             <!-- Selected Date Items -->
-            <div x-show="selectedDateItems.length > 0" class="mt-3 pt-3 border-t border-gray-100 space-y-2 max-h-48 overflow-y-auto">
+            <div x-show="selectedDateItems.length > 0" class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2 max-h-48 overflow-y-auto">
                 <template x-for="item in selectedDateItems" :key="item.id">
-                    <div class="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                        <button @click="toggleComplete(item)" :class="item.completed ? 'text-green-500' : 'text-gray-300'">
+                    <div class="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                        <button @click="toggleComplete(item)" :class="item.completed ? 'text-green-500' : 'text-gray-300 dark:text-gray-500'">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                         </button>
-                        <a :href="item.url" target="_blank" class="flex-1 text-sm truncate" :class="item.completed ? 'text-gray-400 line-through' : 'text-gray-700'" x-text="item.title || 'Untitled'"></a>
-                        <button @click="deleteItem(item.id)" class="text-gray-300 hover:text-red-500">
+                        <a :href="item.url" target="_blank" class="flex-1 text-sm truncate" :class="item.completed ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-200'" x-text="item.title || 'Untitled'"></a>
+                        <button @click="deleteItem(item.id)" class="text-gray-300 dark:text-gray-500 hover:text-red-500">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -132,7 +149,7 @@
                 </template>
             </div>
 
-            <div x-show="selectedDate && selectedDateItems.length === 0" class="mt-3 pt-3 border-t border-gray-100 text-center text-xs text-gray-400">
+            <div x-show="selectedDate && selectedDateItems.length === 0" class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-center text-xs text-gray-400 dark:text-gray-500">
                 No items on this date
             </div>
         </div>
@@ -141,15 +158,15 @@
         <div x-show="viewMode === 'list'" class="space-y-2">
             <template x-for="(group, date) in groupedItems" :key="date">
                 <div>
-                    <div class="text-xs font-medium text-gray-400 mb-1 px-1" x-text="date"></div>
+                    <div class="text-xs font-medium text-gray-400 dark:text-gray-500 mb-1 px-1" x-text="date"></div>
                     <div class="space-y-1">
                         <template x-for="item in group" :key="item.id">
-                            <div class="bg-white rounded-lg p-3 shadow-sm">
+                            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
                                 <div class="flex items-start gap-2">
                                     <button
                                         @click="toggleComplete(item)"
                                         class="mt-0.5 flex-shrink-0"
-                                        :class="item.completed ? 'text-green-500' : 'text-gray-300 hover:text-green-500'"
+                                        :class="item.completed ? 'text-green-500' : 'text-gray-300 dark:text-gray-500 hover:text-green-500'"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" :fill="item.completed ? 'currentColor' : 'none'" />
@@ -158,23 +175,23 @@
 
                                     <div class="flex-1 min-w-0">
                                         <a :href="item.url" target="_blank" class="block">
-                                            <div class="text-sm font-medium truncate" :class="item.completed ? 'text-gray-400 line-through' : 'text-gray-800'" x-text="item.title || 'Untitled'"></div>
+                                            <div class="text-sm font-medium truncate" :class="item.completed ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-800 dark:text-gray-200'" x-text="item.title || 'Untitled'"></div>
                                         </a>
                                         <div class="flex items-center gap-2 mt-0.5">
                                             <span
                                                 class="text-xs px-1.5 py-0.5 rounded"
                                                 :class="{
-                                                    'bg-red-50 text-red-600': item.source_type === 'youtube',
-                                                    'bg-blue-50 text-blue-600': item.source_type === 'article',
-                                                    'bg-gray-100 text-gray-500': item.source_type === 'other'
+                                                    'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400': item.source_type === 'youtube',
+                                                    'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400': item.source_type === 'article',
+                                                    'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400': item.source_type === 'other'
                                                 }"
                                                 x-text="item.source_type === 'youtube' ? 'YouTube' : item.source_type === 'article' ? 'Article' : 'Link'"
                                             ></span>
-                                            <span class="text-xs text-gray-400 truncate" x-text="getDomain(item.url)"></span>
+                                            <span class="text-xs text-gray-400 dark:text-gray-500 truncate" x-text="getDomain(item.url)"></span>
                                         </div>
                                     </div>
 
-                                    <button @click="deleteItem(item.id)" class="text-gray-300 hover:text-red-500 p-1">
+                                    <button @click="deleteItem(item.id)" class="text-gray-300 dark:text-gray-500 hover:text-red-500 p-1">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
@@ -187,8 +204,8 @@
             </template>
 
             <!-- Empty State -->
-            <div x-show="items.length === 0 && !isLoading" class="text-center py-12 text-gray-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div x-show="items.length === 0 && !isLoading" class="text-center py-12 text-gray-400 dark:text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 text-gray-200 dark:text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <p class="text-sm">No items yet</p>
@@ -202,7 +219,7 @@
             return {
                 items: [],
                 newUrl: '',
-                statusFilter: 'all',  // Default to 'all' to show all items
+                statusFilter: 'all',
                 isLoading: false,
                 viewMode: 'list',
                 currentYear: new Date().getFullYear(),
@@ -212,17 +229,34 @@
                 selectedDateItems: [],
                 stats: { total: 0, pending: 0, completed: 0 },
                 showMenu: false,
+                darkMode: false,
 
                 init() {
+                    // Load theme preference
+                    const savedTheme = localStorage.getItem('theme');
+                    if (savedTheme === 'dark') {
+                        this.darkMode = true;
+                    } else if (savedTheme === 'light') {
+                        this.darkMode = false;
+                    } else {
+                        // Follow system preference
+                        this.darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    }
+
                     this.fetchItems();
                     this.fetchItemDates();
                     this.fetchStats();
                 },
 
+                toggleTheme() {
+                    this.darkMode = !this.darkMode;
+                    localStorage.setItem('theme', this.darkMode ? 'dark' : 'light');
+                },
+
                 switchToList() {
                     this.viewMode = 'list';
                     this.selectedDate = null;
-                    this.statusFilter = 'all';  // Show all items in list view
+                    this.statusFilter = 'all';
                     this.fetchItems();
                 },
 
@@ -236,10 +270,8 @@
                     try {
                         let url;
                         if (this.viewMode === 'calendar' && this.selectedDate) {
-                            // Calendar view: fetch all items for selected date (ignore status filter)
                             url = `/api/items?status=all&date=${this.selectedDate}`;
                         } else {
-                            // List view: use status filter
                             url = `/api/items?status=${this.statusFilter}`;
                         }
                         const response = await fetch(url);
@@ -287,7 +319,6 @@
 
                     this.isLoading = true;
                     try {
-                        // Get user's local date in YYYY-MM-DD format (using local timezone, not UTC)
                         const today = new Date();
                         const localDate = today.getFullYear() + '-' +
                             String(today.getMonth() + 1).padStart(2, '0') + '-' +
@@ -385,7 +416,6 @@
                 get groupedItems() {
                     const groups = {};
                     this.items.forEach(item => {
-                        // Use local_date if available, otherwise format captured_at
                         let date;
                         if (item.local_date) {
                             const parts = item.local_date.split('-');
