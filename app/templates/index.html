@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Watchlist</title>
+    <script>
+        // Must be defined BEFORE Tailwind CDN loads so it initializes with class-based dark mode
+        tailwind = { config: { darkMode: 'class' } }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class'
-        }
         // Apply theme before page renders to avoid flash
         (function() {
             const savedTheme = localStorage.getItem('theme');
